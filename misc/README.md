@@ -2,6 +2,9 @@
 
 It's recommended to run this behind something like nginx. A very dumb nginx setup, requires just an nginx install, and setting proxy pass:
 ```
+location / {
+  proxy_pass          http://127.0.0.1:8080;
+}
 ```
 
 Also if you run into `(13 permission denied)` errors, it's probably SELinux rearing its ugly head and you can tell it to buzz off like so [SO post](https://stackoverflow.com/questions/23948527/13-permission-denied-while-connecting-to-upstreamnginx):
