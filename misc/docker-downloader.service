@@ -1,0 +1,7 @@
+[Unit]
+Description=Docker Downloader
+Requires=nginx.service
+[Service]
+ExecStart=/usr/bin/java -jar /opt/gs-spring-boot-0.1.0.jar
+Type=simple
+User=nobody
