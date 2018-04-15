@@ -51,7 +51,7 @@ public class HelloController {
     public void downloadDirect(HttpServletResponse response, String repository, String tag) throws Exception {
         assert repository != null && !repository.isEmpty();
         assert tag != null && !tag.isEmpty();
-        response.addHeader("Content-disposition", "attachment;filename=busybox.tar");//+image.replaceAll("\\W", "-")+".tar");
+        response.addHeader("Content-disposition", "attachment;filename="+(repository+":"+tag).replaceAll("\\W", "-")+".tar");
         response.setContentType("application/x-tar");
 
         TheWholeShebang.FetchImage(repository, tag, response.getOutputStream());
