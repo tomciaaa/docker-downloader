@@ -17,14 +17,14 @@ import java.io.OutputStream;
 import java.net.URISyntaxException;
 
 public class Blob {
-    private static final String registryBase = "https://registry-1.docker.io/v2/";
-
-    public static void Fetch(String image, String blobId, String authToken, OutputStream outputStream) throws URISyntaxException, IOException {
+    public static void Fetch(String registryBase, String image, String blobId, String authToken, OutputStream outputStream) throws URISyntaxException, IOException {
         try(CloseableHttpClient client = HttpClients.createDefault()) {
             URIBuilder builder = new URIBuilder(registryBase);
             builder.setPath("/v2/"+image+"/blobs/"+blobId);
             HttpGet httpGet = new HttpGet(builder.build());
-            httpGet.addHeader("Authorization",  "Bearer "+authToken) ;
+            if (authToken != null) {
+                httpGet.addHeader("Authorization",  "Bearer "+authToken) ;
+            }
             httpGet.addHeader("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip");
             try (CloseableHttpResponse execute = client.execute(httpGet)) {
                 execute.getEntity().writeTo(outputStream);
@@ -33,5 +33,9 @@ public class Blob {
             throw e;
         }
 
+    }
+
+    public static void Fetch(String image, String blobId, String authToken, OutputStream outputStream) throws URISyntaxException, IOException {
+        Fetch("https://registry-1.docker.io/v2/", image, blobId, authToken, outputStream);
     }
 }

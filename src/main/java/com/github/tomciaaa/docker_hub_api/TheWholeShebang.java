@@ -29,13 +29,22 @@ public class TheWholeShebang {
         tarOutput.closeArchiveEntry();
     }
 
-    public static void FetchImage(String imageName, String tag, OutputStream output) throws IOException, URISyntaxException {
-        AuthResponse auth = Auth.GetAuthToken(imageName);
-        ManifestResponse fetch = Manifest.Fetch(imageName + ":" + tag, auth.getToken());
+    public static void FetchImage(String registry, String imageName, String tag, OutputStream output) throws IOException, URISyntaxException {
+        AuthResponse auth;
+        if (registry == null) {
+            auth = Auth.GetAuthToken(imageName);
+            registry = "https://registry-1.docker.io/v2/";
+        } else {
+            auth = new AuthResponse();
+            auth.setExpiresIn(86400);
+            auth.setIssuedAt(new Date());
+        }
+
+        ManifestResponse fetch = Manifest.Fetch(registry, imageName + ":" + tag, auth.getToken());
         TarArchiveOutputStream tarOutput = new TarArchiveOutputStream(output);
 
         ByteArrayOutputStream configBytes = new ByteArrayOutputStream(fetch.getConfig().getSize());
-        Blob.Fetch(imageName, fetch.getConfig().getDigest(), auth.getToken(), configBytes);
+        Blob.Fetch(registry, imageName, fetch.getConfig().getDigest(), auth.getToken(), configBytes);
 
         //Stip sha256: prefix and give it .json extension
         String configFn = fetch.getConfig().getDigest().substring(7)+".json";
@@ -64,7 +73,7 @@ public class TheWholeShebang {
             TarArchiveEntry entry = new TarArchiveEntry(layerId+"/layer.tar");
             entry.setSize(layer.getSize());
             tarOutput.putArchiveEntry(entry);
-            Blob.Fetch(imageName, layer.getDigest(), auth.getToken(), tarOutput);
+            Blob.Fetch(registry, imageName, layer.getDigest(), auth.getToken(), tarOutput);
             tarOutput.closeArchiveEntry();
 
             // Set parent to this one
@@ -85,6 +94,10 @@ public class TheWholeShebang {
         stickContentIntoTarStream(tarOutput, "repositories", new ObjectMapper().writeValueAsBytes(node));
 
         tarOutput.finish();
+    }
+
+    public static void FetchImage(String imageName, String tag, OutputStream output) throws IOException, URISyntaxException {
+        FetchImage(null, imageName, tag, output);
     }
 
     private static void writeProperJson(TarArchiveOutputStream tarOutput, String layerId, String parent, ByteArrayOutputStream configBytes) throws IOException {

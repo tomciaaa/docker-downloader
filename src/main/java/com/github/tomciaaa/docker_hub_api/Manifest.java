@@ -22,8 +22,7 @@ public class Manifest {
 			-H 'Accept: application/vnd.docker.distribution.manifest.v1+json' \
 			"$registryBase/v2/$image/manifests/$digest"
 			*/
-    private static final String registryBase = "https://registry-1.docker.io/v2/";
-    public static ManifestResponse Fetch(String imageAndTag, String authToken) throws URISyntaxException, IOException {
+    public static ManifestResponse Fetch(String registryBase, String imageAndTag, String authToken) throws URISyntaxException, IOException {
         String[] parts = imageAndTag.split(":", 2);
         if (parts.length < 2 ) {
             throw new RuntimeException("Invalidiamge");
@@ -32,16 +31,26 @@ public class Manifest {
             URIBuilder builder = new URIBuilder(registryBase);
             builder.setPath("/v2/"+parts[0]+"/manifests/"+parts[1]);
             HttpGet httpGet = new HttpGet(builder.build());
-            httpGet.addHeader("Authorization",  "Bearer "+authToken) ;
+            if (authToken != null) {
+                httpGet.addHeader("Authorization",  "Bearer "+authToken) ;
+            }
             httpGet.addHeader("Accept", "application/vnd.docker.distribution.manifest.v2+json");
             try (CloseableHttpResponse execute = client.execute(httpGet)) {
-                String s = EntityUtils.toString(execute.getEntity());
-                ManifestResponse obj = new ObjectMapper().readValue(s, ManifestResponse.class);
-                obj.setRawContent(s);
-                return obj;
+                if (execute.getEntity().getContentType().getValue().equals("application/vnd.docker.distribution.manifest.v2+json")) {
+                    String s = EntityUtils.toString(execute.getEntity());
+                    ManifestResponse obj = new ObjectMapper().readValue(s, ManifestResponse.class);
+                    obj.setRawContent(s);
+                    return obj;
+                } else {
+                    throw new IOException("Unsupported return type: " + execute.getEntity().getContentType().getValue());
+                }
             }
         } catch (IOException e) {
             throw e;
         }
+    }
+
+    public static ManifestResponse Fetch(String imageAndTag, String authToken) throws URISyntaxException, IOException {
+        return Fetch("https://registry-1.docker.io/v2/", imageAndTag, authToken);
     }
 }
