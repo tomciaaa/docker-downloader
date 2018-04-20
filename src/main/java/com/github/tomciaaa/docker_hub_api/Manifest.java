@@ -2,6 +2,8 @@ package com.github.tomciaaa.docker_hub_api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomciaaa.docker_hub_api.model.ManifestResponse;
+import com.github.tomciaaa.docker_hub_api.model.ManifestResponseV1;
+import com.github.tomciaaa.docker_hub_api.model.ManifestResponseV2;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
@@ -36,9 +38,15 @@ public class Manifest {
             }
             httpGet.addHeader("Accept", "application/vnd.docker.distribution.manifest.v2+json");
             try (CloseableHttpResponse execute = client.execute(httpGet)) {
-                if (execute.getEntity().getContentType().getValue().equals("application/vnd.docker.distribution.manifest.v2+json")) {
-                    String s = EntityUtils.toString(execute.getEntity());
-                    ManifestResponse obj = new ObjectMapper().readValue(s, ManifestResponse.class);
+                String s = EntityUtils.toString(execute.getEntity());
+                if (execute.getEntity().getContentType().getValue().startsWith("application/vnd.docker.distribution.manifest.v2")) {
+                    ManifestResponseV2 obj = new ObjectMapper().readValue(s, ManifestResponseV2.class);
+                    obj.setRawContent(s);
+                    return obj;
+
+                } else if (execute.getEntity().getContentType().getValue().startsWith("application/vnd.docker.distribution.manifest.v1")) {
+                    //throw new IOException("Not yet supported return type: " + execute.getEntity().getContentType().getValue());
+                    ManifestResponseV1 obj = new ObjectMapper().readValue(s, ManifestResponseV1.class);
                     obj.setRawContent(s);
                     return obj;
                 } else {

@@ -1,12 +1,11 @@
 package com.github.tomciaaa.docker_hub_api;
 
+import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.github.tomciaaa.docker_hub_api.model.AuthResponse;
-import com.github.tomciaaa.docker_hub_api.model.ManifestResponse;
-import com.github.tomciaaa.docker_hub_api.model.ManifestResponseConfig;
+import com.github.tomciaaa.docker_hub_api.model.*;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -42,16 +41,55 @@ public class TheWholeShebang {
 
         ManifestResponse fetch = Manifest.Fetch(registry, imageName + ":" + tag, auth.getToken());
         TarArchiveOutputStream tarOutput = new TarArchiveOutputStream(output);
+        String parent;
+        switch (fetch.getSchemaVersion()) {
+            case 2:
+                parent = handleV2Manifest(registry, imageName, tag, auth, (ManifestResponseV2)fetch, tarOutput);
+                break;
+            case 1:
+                parent = handleV1Manifest(registry, imageName, tag, auth, (ManifestResponseV1)fetch, tarOutput);
+                break;
+            default:
+                throw new IOException("Bad revision:"+ fetch.getSchemaVersion());
+        }
 
+
+        ObjectNode node = (ObjectNode) new ObjectMapper().readTree("{}");
+        node.putObject(imageName.replaceAll("^library/", "")).put(tag, parent);
+        stickContentIntoTarStream(tarOutput, "repositories", new ObjectMapper().writeValueAsBytes(node));
+
+        tarOutput.finish();
+    }
+
+    private static String handleV1Manifest(String registry, String imageName, String tag, AuthResponse auth, ManifestResponseV1 fetch, TarArchiveOutputStream tarOutput) throws URISyntaxException, IOException {
+        List<String> layerFiles = new ArrayList<>();
+        String imageId = null;
+        for (int i=0; i<fetch.getFsLayers().size(); i++) {
+            String json = fetch.getHistory().get(i).getV1Compatibility();
+            ObjectNode jsonNode =(ObjectNode) new ObjectMapper().readTree(json);
+            int size = -1; //jsonNode.get("Size").asInt(); apparently returns rubbish
+            String layerId = jsonNode.get("id").asText();
+            if (i == 0) {
+                imageId = layerId;
+            }
+
+            stickContentIntoTarStream(tarOutput, layerId+"/json", json.getBytes());
+            WriteThing(tarOutput, layerId);
+            auth = writeFetchAndWriteBlob(registry, imageName, auth, tarOutput, layerFiles, size, fetch.getFsLayers().get(i).getBlobSum(), layerId);
+        }
+        return imageId;
+    }
+
+    private static String handleV2Manifest(String registry, String imageName, String tag, AuthResponse auth, ManifestResponseV2 fetch, TarArchiveOutputStream tarOutput) throws URISyntaxException, IOException {
+        List<String> layerFiles = new ArrayList<>();
         ByteArrayOutputStream configBytes = new ByteArrayOutputStream(fetch.getConfig().getSize());
-        Blob.Fetch(registry, imageName, fetch.getConfig().getDigest(), auth.getToken(), configBytes);
+        Blob.Fetch(registry, imageName, fetch.getConfig().getDigest(), auth.getToken(), configBytes, null);
 
         //Stip sha256: prefix and give it .json extension
         String configFn = fetch.getConfig().getDigest().substring(7)+".json";
         stickContentIntoTarStream(tarOutput, configFn, configBytes.toByteArray());
 
         String parent = "";
-        List<String> layerFiles = new ArrayList<>();
         for (int i=0; i<fetch.getLayers().size(); i++) {
             ManifestResponseConfig layer = fetch.getLayers().get(i);
             String layerId = DigestUtils.sha256Hex(parent + "\n" + layer.getDigest()+"\n");
@@ -65,16 +103,7 @@ public class TheWholeShebang {
             WriteThing(tarOutput, layerId);
 
             // Fetch the blob
-            // TODO: non-UTC crap
-            if (new Date().getTime() - auth.issuedAt.getTime() > auth.getExpiresIn() * 1000 - 10000) {
-                auth = Auth.GetAuthToken(imageName);
-            }
-            layerFiles.add(layerId+"/layer.tar");
-            TarArchiveEntry entry = new TarArchiveEntry(layerId+"/layer.tar");
-            entry.setSize(layer.getSize());
-            tarOutput.putArchiveEntry(entry);
-            Blob.Fetch(registry, imageName, layer.getDigest(), auth.getToken(), tarOutput);
-            tarOutput.closeArchiveEntry();
+            auth = writeFetchAndWriteBlob(registry, imageName, auth, tarOutput, layerFiles, layer.getSize(), layer.getDigest(), layerId);
 
             // Set parent to this one
             parent = layerId;
@@ -87,13 +116,25 @@ public class TheWholeShebang {
         ArrayNode layersNode = node.putArray("Layers");
         layerFiles.forEach(layersNode::add);
         stickContentIntoTarStream(tarOutput, "manifest.json", new ObjectMapper().writeValueAsBytes(arrNode));
+        return parent;
+    }
 
-
-        node = (ObjectNode) new ObjectMapper().readTree("{}");
-        node.putObject(imageName.replaceAll("^library/", "")).put(tag, parent);
-        stickContentIntoTarStream(tarOutput, "repositories", new ObjectMapper().writeValueAsBytes(node));
-
-        tarOutput.finish();
+    private static AuthResponse writeFetchAndWriteBlob(String registry, String imageName, AuthResponse auth, TarArchiveOutputStream tarOutput, List<String> layerFiles, int size, String digest, String layerId) throws URISyntaxException, IOException {
+        // TODO: non-UTC crap
+        if (new Date().getTime() - auth.issuedAt.getTime() > auth.getExpiresIn() * 1000 - 10000) {
+            auth = Auth.GetAuthToken(imageName);
+        }
+        layerFiles.add(layerId+"/layer.tar");
+        if (size > 0) {
+            TarArchiveEntry entry = new TarArchiveEntry(layerId + "/layer.tar");
+            entry.setSize(size);
+            tarOutput.putArchiveEntry(entry);
+            Blob.Fetch(registry, imageName, digest, auth.getToken(), tarOutput, null);
+            tarOutput.closeArchiveEntry();
+        } else {
+            Blob.Fetch(registry, imageName, digest, auth.getToken(), tarOutput, layerId+"/layer.tar");
+        }
+        return auth;
     }
 
     public static void FetchImage(String imageName, String tag, OutputStream output) throws IOException, URISyntaxException {

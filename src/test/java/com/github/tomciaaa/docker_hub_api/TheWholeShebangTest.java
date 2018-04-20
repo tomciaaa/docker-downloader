@@ -51,7 +51,6 @@ public class TheWholeShebangTest {
     }
 
     @Test
-    @Ignore("Quay.io returns unsupported manifests")
     public void fetch_from_quay_io() throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         TheWholeShebang.FetchImage("https://quay.io/v2/", "prometheus/busybox", "latest", os);
@@ -64,8 +63,9 @@ public class TheWholeShebangTest {
             assertThat(entry.getSize()).isGreaterThan(0);
             entry = tarIn.getNextTarEntry();
         }
-        assertThat(names).contains("manifest.json", "repositories");
+        assertThat(names).contains("repositories");
         assertThat(names).anyMatch(x -> x.endsWith("/layer.tar"));
-        assertThat(names).anyMatch(x -> x.matches("\\w{64}\\.json"));
+        // Does not get generated from v1 schemas
+        //assertThat(names).anyMatch(x -> x.matches("\\w{64}\\.json"));
     }
 }
