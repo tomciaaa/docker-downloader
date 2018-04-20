@@ -30,7 +30,7 @@ public class TheWholeShebang {
 
     public static void FetchImage(String registry, String imageName, String tag, OutputStream output) throws IOException, URISyntaxException {
         AuthResponse auth;
-        if (registry == null) {
+        if (registry == null || registry.isEmpty()) {
             auth = Auth.GetAuthToken(imageName);
             registry = "https://registry-1.docker.io/";
         } else {
