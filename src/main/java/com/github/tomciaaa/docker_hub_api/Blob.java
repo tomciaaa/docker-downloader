@@ -45,15 +45,15 @@ public class Blob {
                         case "GET":
                             return new HttpGet(uri) {
                                 @Override
-                                public Header[] getHeaders(String name) {
-                                    return Arrays.stream(super.getHeaders(name)).filter(x -> !x.getName().equalsIgnoreCase("authorization")).collect(Collectors.toList()).toArray(new Header[0]);
+                                public void setHeaders(Header[] headers) {
+                                    super.setHeaders(Arrays.stream(headers).filter(x -> !x.getName().equalsIgnoreCase("authorization")).collect(Collectors.toList()).toArray(new Header[0]));
                                 }
                             };
                         case "HEAD":
                             return new HttpHead(uri) {
                                 @Override
-                                public Header[] getHeaders(String name) {
-                                    return Arrays.stream(super.getHeaders(name)).filter(x -> !x.getName().equalsIgnoreCase("authorization")).collect(Collectors.toList()).toArray(new Header[0]);
+                                public void setHeaders(Header[] headers) {
+                                    super.setHeaders(Arrays.stream(headers).filter(x -> !x.getName().equalsIgnoreCase("authorization")).collect(Collectors.toList()).toArray(new Header[0]));
                                 }
                             };
                         default:
