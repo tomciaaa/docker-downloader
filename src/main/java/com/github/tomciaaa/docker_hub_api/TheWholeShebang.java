@@ -32,8 +32,9 @@ public class TheWholeShebang {
         AuthResponse auth;
         if (registry == null) {
             auth = Auth.GetAuthToken(imageName);
-            registry = "https://registry-1.docker.io/v2/";
+            registry = "https://registry-1.docker.io/";
         } else {
+            registry = "https://" + registry + "/";
             auth = new AuthResponse();
             auth.setExpiresIn(86400);
             auth.setIssuedAt(new Date());

@@ -29,13 +29,14 @@ public class TheWholeShebangTest {
         }
         assertThat(names).contains("manifest.json", "repositories");
         assertThat(names).anyMatch(x -> x.endsWith("/layer.tar"));
+        assertThat(names).anyMatch(x -> x.endsWith("/VERSION"));
         assertThat(names).anyMatch(x -> x.matches("\\w{64}\\.json"));
     }
 
     @Test
     public void fetch_from_gcr_io() throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        TheWholeShebang.FetchImage("https://gcr.io/v2/", "google_containers/pause-amd64", "3.1", os);
+        TheWholeShebang.FetchImage("gcr.io", "google_containers/pause-amd64", "3.1", os);
         TarArchiveInputStream tarIn = new TarArchiveInputStream(new ByteArrayInputStream(os.toByteArray()));
 
         List<String> names = new ArrayList<>();
@@ -47,13 +48,14 @@ public class TheWholeShebangTest {
         }
         assertThat(names).contains("manifest.json", "repositories");
         assertThat(names).anyMatch(x -> x.endsWith("/layer.tar"));
+        assertThat(names).anyMatch(x -> x.endsWith("/VERSION"));
         assertThat(names).anyMatch(x -> x.matches("\\w{64}\\.json"));
     }
 
     @Test
     public void fetch_from_quay_io() throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        TheWholeShebang.FetchImage("https://quay.io/v2/", "prometheus/busybox", "latest", os);
+        TheWholeShebang.FetchImage("quay.io", "prometheus/busybox", "latest", os);
         TarArchiveInputStream tarIn = new TarArchiveInputStream(new ByteArrayInputStream(os.toByteArray()));
 
         List<String> names = new ArrayList<>();
@@ -65,6 +67,7 @@ public class TheWholeShebangTest {
         }
         assertThat(names).contains("repositories");
         assertThat(names).anyMatch(x -> x.endsWith("/layer.tar"));
+        assertThat(names).anyMatch(x -> x.endsWith("/VERSION"));
         // Does not get generated from v1 schemas
         //assertThat(names).anyMatch(x -> x.matches("\\w{64}\\.json"));
     }
